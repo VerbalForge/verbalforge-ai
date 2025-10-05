@@ -1,0 +1,16 @@
+[flake8]
+max-line-length = 100
+exclude = __pycache__
+ignore = 
+    # Module level import not at top of file (needed for path manipulation)
+    E402,
+    # Imported but unused (needed for __all__ exports)
+    F401
+per-file-ignores =
+    # Allow long lines in prompt files as they contain prompt templates
+    src/core/prompts/*.py:E501
+    # Allow module-level imports in server config files
+    src/server/config/settings.py:E402
+    src/server/services/generator.py:E402
+    # Allow unused imports in __init__.py files for public API
+    src/core/__init__.py:F401

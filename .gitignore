@@ -1,0 +1,15 @@
+# Python trash
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Virtual environment
+.venv/
+
+# Local logs
+logs/
+
+# Environment variables
+.env

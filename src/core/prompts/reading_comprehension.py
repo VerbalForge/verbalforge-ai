@@ -51,7 +51,8 @@ Create a substantial passage (~350-450 words) distributed across 2-3 paragraphs 
 
 **Question Type 3: Select-in-Passage (Highlighting)**
 - Include 4-5 numbered sentence options (flexible based on passage length)
-- Create options as actual sentence text with numbers: ["[1] Coined by Jan de Vries...", "[2] Yet archival wages...", etc.]
+- Each choice must be a proper object with "option" containing the full numbered sentence text
+- Format: {{"option": "[1] First sentence text...", "blank": 1, "is_correct": true/false, "reasoning": "..."}}
 - Ask which line best supports author's attitude, provides evidence, etc.
 - Only one correct line answer - mark it with is_correct: true in justification
 - Select the most relevant and meaningful sentences from the passage for options
@@ -62,7 +63,7 @@ Return a JSON object with this exact structure with {count} questions:
         "passage": "[1] First sentence. [2] Second sentence. [3] Third sentence...",
         "source": "Journal Name, Year or Credible Source",
         "title": "Descriptive Title for the Passage"
-    }},
+    }},x
     "questions": [
         {{
             "question_type": "reading_comprehension_single",
@@ -96,9 +97,9 @@ Return a JSON object with this exact structure with {count} questions:
 - Each choice MUST have: "option", "blank": 1, "is_correct", "reasoning"
 - Type 1 (reading_comprehension_single): 5 choices, exactly 1 with is_correct: true
 - Type 2 (reading_comprehension_multiple): 3 choices, 1-3 with is_correct: true
-- Type 3 (reading_comprehension_highlight): 4 choices (each option is a full numbered sentence like "First sentence..."), exactly 1 correct
-- Return ONLY valid JSON (- Return ONLY valid JSON (no markdown, no code fences, no extra text)
-no markdown, no prose)
+- Type 3 (reading_comprehension_highlight): 4-5 choices where each "option" contains a numbered sentence like "[1] First sentence text...", exactly 1 correct
+- **IMPORTANT**: All choice types (including highlight) must use the same object structure with "option", "blank", "is_correct", "reasoning"
+- Return ONLY valid JSON (no markdown, no code fences, no extra text)
 
 **Format Requirements:**
 - Each choice object must have: "option" (complete text), "blank": 1, "is_correct" (boolean), "reasoning" (explanation)

@@ -68,8 +68,8 @@ class MongoDBService:
         timestamp = datetime.now(timezone.utc)
 
         for question in questions:
-            # Add server metadata
-            question["question_id"] = str(uuid.uuid4())
+            # Generate UUID for _id
+            question["_id"] = str(uuid.uuid4())
             question["metadata"] = {
                 "created_at": timestamp.isoformat(),
                 "updated_at": timestamp.isoformat(),
@@ -80,7 +80,6 @@ class MongoDBService:
             try:
                 result = self.questions.insert_one(question)
                 if result.inserted_id:
-                    question["_id"] = result.inserted_id  # Add MongoDB ID to the dict
                     stored += 1
             except Exception as e:
                 self.logger.error(f"Failed to store question: {e}")
@@ -94,12 +93,8 @@ class MongoDBService:
             return 0
 
         try:
-            from bson import ObjectId
-
-            object_ids = [ObjectId(qid) for qid in question_ids]
-
             result = self.questions.update_many(
-                {"_id": {"$in": object_ids}}, {"$set": {"passage_id": passage_id}}
+                {"_id": {"$in": question_ids}}, {"$set": {"passage_id": passage_id}}
             )
 
             self.logger.info(f"Updated {result.modified_count} questions with passage_id")
@@ -124,10 +119,11 @@ class MongoDBService:
         timestamp = datetime.now(timezone.utc)
 
         doc = {
+            "_id": str(uuid.uuid4()),
             "passage": passage_data.get("passage", ""),
             "source": passage_data.get("source", "Unknown"),
             "title": passage_data.get("title", "Reading Comprehension"),
-            "difficulty_level": passage_data.get("difficulty_level", "medium"),
+            "difficulty": passage_data.get("difficulty_level", "medium"),
             "type": passage_data.get("type", "reading_comprehension_passage"),
             "question_ids": passage_data.get("question_ids", []),
             "metadata": {
@@ -141,7 +137,7 @@ class MongoDBService:
         try:
             result = self.passages.insert_one(doc)
             if result.inserted_id:
-                return str(result.inserted_id)
+                return doc["_id"]
         except Exception as e:
             self.logger.error(f"Failed to store passage: {e}")
 
@@ -181,12 +177,13 @@ class MongoDBService:
             # Collect question IDs from this passage
             question_ids = []
             for q in rc.get("questions", []):
-                qid = q.get("question_id") or q.get("id")
+                qid = q.get("_id") or q.get("id")
                 if qid:
                     question_ids.append(qid)
 
             # Build passage document
             doc = {
+                "_id": str(uuid.uuid4()),
                 "passage": rc.get("passage", ""),
                 "source": rc.get("source", ""),
                 "question_ids": question_ids,
@@ -202,7 +199,7 @@ class MongoDBService:
                 result = self.passages.insert_one(doc)
                 if result.inserted_id:
                     # Store mapping of passage_id to question_ids for linking
-                    passage_mappings.append((str(result.inserted_id), question_ids))
+                    passage_mappings.append((doc["_id"], question_ids))
             except Exception as e:
                 self.logger.error(f"Failed to store passage: {e}")
 

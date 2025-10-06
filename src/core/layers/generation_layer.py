@@ -55,7 +55,7 @@ class GenerationLayer:
         system_prompt, generation_prompt = self.prompt_service.get_prompts(
             question_type=request.question_type,
             count=request.count,
-            difficulty=request.difficulty_level,
+            difficulty=request.difficulty_level.value,
             topic=request.topic,
         )
 

@@ -1,6 +1,6 @@
 # Makefile for VerbalForge Server
 SHELL := /bin/bash
-.PHONY: help install clean test lint format run dev
+.PHONY: help install clean clean-db test lint format run dev
 
 # Default target
 help:
@@ -12,6 +12,7 @@ help:
 	@echo "  run        Run server (production mode)"
 	@echo "  dev        Run server (development mode)"
 	@echo "  clean      Clean build artifacts and cache"
+	@echo "  clean-db   Wipe MongoDB database (WARNING: deletes all data!)"
 	@echo "  test       Run all tests"
 	@echo "  lint       Run code linting"
 	@echo "  format     Format code with black"
@@ -45,6 +46,10 @@ clean:
 	find . -name "*.pyc" -delete
 	find . -name "*.pyo" -delete
 	@echo "Cleanup complete!"
+
+# Clean MongoDB database
+clean-db:
+	@python3 scripts/clean_db.py
 
 lint:
 	@echo "Running code linting..."

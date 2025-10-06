@@ -1,20 +1,20 @@
 GENERATION_INTERVAL_HOURS = 2
 QUESTION_CONFIG = {
     "text_completion": {
-        "easy": 0,
+        "easy": 5,
         "medium": 5,
         "hard": 5,
     },
     "sentence_equivalence": {
-        "easy": 0,
-        "medium": 0,
-        "hard": 0,
+        "easy": 5,
+        "medium": 5,
+        "hard": 5,
     },
     "reading_comprehension": {
-        "easy": 0,
-        "medium": 0,
-        "hard": 0,
-        "questions_per_passage": 0,
+        "easy": 2,
+        "medium": 4,
+        "hard": 4,
+        "questions_per_passage": 4,
     },
 }
 

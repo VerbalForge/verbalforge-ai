@@ -32,6 +32,7 @@ class FormattingService:
                     "passage": {
                         "text": item.passage,
                         "source": item.source,
+                        "title": item.title,
                     },
                     "questions": [self._format_question(q) for q in item.questions],
                 }

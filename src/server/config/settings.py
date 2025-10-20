@@ -7,10 +7,11 @@ Loads and manages environment-based configuration settings.
 import sys
 from pathlib import Path
 
-# Ensure verbalforge package is importable
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+# Add project root to path to enable absolute imports
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-from core.utils.settings import settings as core_settings
+from src.core.utils.settings import settings as core_settings
 
 
 def get_settings():

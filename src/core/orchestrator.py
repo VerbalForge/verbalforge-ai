@@ -152,6 +152,93 @@ class QuestionOrchestrator:
             )
             raise
 
+    async def generate_questions_with_conversation(
+        self,
+        count: int = 5,
+        question_type: PromptQuestionType = PromptQuestionType.TEXT_COMPLETION,
+        difficulty_level: str = "medium",
+        conversation_history: list = None,
+        topic: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+        validate_output: bool = True,
+    ) -> tuple[Dict[str, Any], list]:
+        """Generate GRE questions continuing a conversation
+
+        Args:
+            count: Number of questions to generate (1-10)
+            question_type: Type of questions to generate
+            difficulty_level: Difficulty level ('easy', 'medium', 'hard')
+            conversation_history: List of previous conversation messages
+            topic: Optional topic to focus on
+            custom_instructions: Additional instructions for generation
+            validate_output: Whether to validate and filter questions
+
+        Returns:
+            Tuple of (output dict with questions, updated conversation history)
+        """
+        start_time = time.time()
+
+        logger.info(
+            f"Starting conversation-based generation of {count} {question_type.value} questions at {difficulty_level} level"
+        )
+        logger.info(f"Conversation history: {len(conversation_history or [])} messages")
+        if topic:
+            logger.info(f"Topic focus: {topic}")
+
+        # Create generation request
+        request = GenerationRequest(
+            count=count,
+            question_type=question_type,
+            difficulty_level=difficulty_level,
+            topic=topic,
+            custom_instructions=custom_instructions,
+        )
+
+        try:
+            # Generate questions with conversation
+            logger.info("Requesting question generation with conversation from generation layer")
+            batch, updated_history = await self.generation_layer.generate_questions_with_conversation(
+                request=request,
+                conversation_history=conversation_history or []
+            )
+            generation_time = time.time() - start_time
+
+            logger.info(
+                f"Initial generation completed in {generation_time:.2f}s - "
+                f"{len(batch.questions)} questions generated, "
+                f"conversation now has {len(updated_history)} messages"
+            )
+
+            # Validate if requested
+            if validate_output:
+                logger.info("Starting output validation and filtering")
+                validation_start = time.time()
+                batch = self.validation_service.validate_and_filter_batch(batch)
+                validation_time = time.time() - validation_start
+                logger.info(
+                    f"Validation completed in {validation_time:.2f}s - {len(batch.questions)} questions remaining"
+                )
+            else:
+                logger.info("Skipping validation as requested")
+
+            # Convert to output format
+            logger.info("Formatting output to JSON")
+            output = self.formatting_service.format_to_json(batch)
+
+            total_time = time.time() - start_time
+            logger.info(f"Conversation-based generation completed successfully in {total_time:.2f}s")
+
+            return output, updated_history
+
+        except Exception as e:
+            elapsed_time = time.time() - start_time
+            logger.error(f"Conversation-based generation failed after {elapsed_time:.2f}s: {e}")
+            logger.info(
+                f"Failed request details - count: {count}, type: {question_type.value}, "
+                f"difficulty: {difficulty_level}"
+            )
+            raise
+
     def get_supported_question_types(self) -> list[str]:
         """Get list of supported question types
 

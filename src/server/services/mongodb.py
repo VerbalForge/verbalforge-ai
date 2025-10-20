@@ -26,6 +26,7 @@ class MongoDBService:
         self.db = None
         self.questions = None
         self.passages = None
+        self.words = None
         self.logger = logging.getLogger("VerbalForgeServer.MongoDB")
 
     def connect(self) -> None:
@@ -42,6 +43,7 @@ class MongoDBService:
             self.db = self.client[self.database_name]
             self.questions = self.db.questions
             self.passages = self.db.passages
+            self.words = self.db.words
 
             self.logger.info(f"Using database: {self.database_name}")
 
@@ -118,6 +120,18 @@ class MongoDBService:
 
         timestamp = datetime.now(timezone.utc)
 
+        # Start with base metadata
+        base_metadata = {
+            "created_at": timestamp.isoformat(),
+            "updated_at": timestamp.isoformat(),
+            "published_at": timestamp.isoformat(),
+            "batch_id": batch_id,
+        }
+        
+        # Merge with any metadata from passage_data (e.g., Atlantic source info)
+        if "metadata" in passage_data:
+            base_metadata.update(passage_data["metadata"])
+
         doc = {
             "_id": str(uuid.uuid4()),
             "passage": passage_data.get("passage", ""),
@@ -126,12 +140,7 @@ class MongoDBService:
             "difficulty": passage_data.get("difficulty_level", "medium"),
             "type": passage_data.get("type", "reading_comprehension_passage"),
             "question_ids": passage_data.get("question_ids", []),
-            "metadata": {
-                "created_at": timestamp.isoformat(),
-                "updated_at": timestamp.isoformat(),
-                "published_at": timestamp.isoformat(),
-                "batch_id": batch_id,
-            },
+            "metadata": base_metadata,
         }
 
         try:
@@ -205,3 +214,64 @@ class MongoDBService:
 
         self.logger.info(f"Stored {len(passage_mappings)} passage(s)")
         return passage_mappings
+
+    def fetch_target_words(self, count: int = 5) -> List[Dict[str, Any]]:
+        """
+        Fetch random words for vocabulary-focused generation
+        
+        Args:
+            count: Number of words to fetch (default: 5)
+            
+        Returns:
+            List of word documents with their full schema
+        """
+        if self.words is None:
+            self.logger.warning("Words collection not initialized")
+            return []
+            
+        try:
+            # Use $sample to get random words from the collection
+            pipeline = [
+                {"$sample": {"size": count}}
+            ]
+            
+            words = list(self.words.aggregate(pipeline))
+            self.logger.info(f"Fetched {len(words)} random target words for generation")
+            
+            return words
+            
+        except Exception as e:
+            self.logger.error(f"Failed to fetch target words: {e}")
+            return []
+    
+    def update_word_questions(self, word_id: str, question_ids: List[str]) -> bool:
+        """
+        Add question IDs to a word's question_ids array
+        
+        Args:
+            word_id: The _id of the word document
+            question_ids: List of question IDs to add
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if self.words is None or not word_id or not question_ids:
+            return False
+            
+        try:
+            # Use $addToSet to avoid duplicates
+            result = self.words.update_one(
+                {"_id": word_id},
+                {"$addToSet": {"question_ids": {"$each": question_ids}}}
+            )
+            
+            if result.modified_count > 0:
+                self.logger.info(f"Updated word '{word_id}' with {len(question_ids)} question IDs")
+                return True
+            else:
+                self.logger.debug(f"Word '{word_id}' already had these question IDs")
+                return True
+                
+        except Exception as e:
+            self.logger.error(f"Failed to update word '{word_id}': {e}")
+            return False

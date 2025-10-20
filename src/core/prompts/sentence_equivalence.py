@@ -24,6 +24,12 @@ Generate {count} high-quality GRE Sentence Equivalence questions at {difficulty}
 
 Each question must adhere to the expert standards for GRE question creation.
 
+**If vocabulary words are specified above:**
+- Use the target words or their synonyms as the TWO correct answer choices
+- Ensure the sentence context naturally requires these vocabulary words
+- Include plausible distractors from the word's synonyms that don't fit the context
+- Test understanding of nuanced meanings and contextual appropriateness
+
 Return a JSON array with {count} objects, each having this exact structure:
 [
     {{

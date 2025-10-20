@@ -76,24 +76,33 @@ class LLMService:
         Returns:
             LLMResponse with content and metadata
         """
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        return await self.generate_with_history(messages)
+
+    async def generate_with_history(self, messages: list) -> LLMResponse:
+        """Generate response from LLM with conversation history
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+                     e.g., [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
+
+        Returns:
+            LLMResponse with content and metadata
+        """
         start_time = time.time()
 
         try:
             logger.info(f"Generating response using {self.provider_type}")
 
-            # Prepare messages
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ]
-
-            # DEBUG: Log the actual prompts being sent to LLM
+            # DEBUG: Log the messages being sent to LLM
             logger.debug("=" * 80)
-            logger.debug("SYSTEM PROMPT SENT TO LLM:")
-            logger.debug(system_prompt)
-            logger.debug("=" * 80)
-            logger.debug("USER PROMPT SENT TO LLM:")
-            logger.debug(user_prompt)
+            logger.debug(f"MESSAGES SENT TO LLM ({len(messages)} messages):")
+            for i, msg in enumerate(messages):
+                logger.debug(f"Message {i+1} ({msg['role']}):")
+                logger.debug(msg['content'][:200] + "..." if len(msg['content']) > 200 else msg['content'])
             logger.debug("=" * 80)
 
             # Get model name (handle Azure deployment vs OpenAI model)

@@ -21,23 +21,20 @@ GRE Reading Comprehension supports three question types with specific frequency 
    - Tests precision in identifying textual support for author's attitude, purpose, or evidence
 
 Key requirements:
-1. Create a substantive passage (~350-450 words) from high-quality academic sources and journals such as The New York Times, The Economist, The Atlantic, and Scientific American as well as university-level academic textbooks and articles from scholarly journals.
+1. Create passages (~350-450 words) with sophisticated academic writing appropriate for graduate students
 2. Generate questions that test different cognitive skills across all three question types
-3. Use sophisticated academic writing appropriate for graduate students
-4. Ensure questions can only be answered by understanding the passage
+3. Ensure questions can only be answered by understanding the passage
+4. STRONGLY PREFER topics from: sciences (biology, physics, chemistry), astronomy, economics, US history, psychology, sociology, anthropology, and archaeology
+5. Vary topics within a batch - avoid repeating the same subject area
 
 Response format: Return ONLY raw JSON (no prose, no Markdown code fences) with the exact structure specified.
-
-Diversity requirement:
-- Avoid reusing the same overarching subject area or core theme within a batch.
-- Prefer varied domains across sciences, humanities, social sciences, astronomy, economics, US history, psychology, sociology, and the arts.
 """
 
 GENERATION_PROMPT = """Generate {count} high-quality GRE Reading Comprehension questions at {difficulty} difficulty level.
 
 {topic_instruction}
 
-Create a substantial passage (~350-450 words) distributed across 2-3 paragraphs followed by {count} questions that mix all three GRE question types:
+Create a substantial passage (~400-500 words) distributed across 2-3 paragraphs followed by {count} questions that mix all three GRE question types:
 
 **Question Type 1: Multiple Choice – Select One Answer Choice**
 - Include exactly 5 answer choices

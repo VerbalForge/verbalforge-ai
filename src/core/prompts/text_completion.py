@@ -35,6 +35,12 @@ Each question must:
 5. Require understanding of logic, tone, and meaning
 6. Provide clear justifications for each option (correct vs incorrect)
 
+**If vocabulary words are specified above:**
+- Incorporate these words naturally into the passage context or answer choices
+- Use the words in ways that test contextual understanding, not just definitions
+- Ensure distractors include related words or near-synonyms that don't fit the context
+- Create passages where the vocabulary is essential to comprehension
+
 **CRITICAL formatting rules:**
 - Each option must include the text, correctness flag, and reasoning in a single object
 - For multi-blank questions: mark correct answers clearly with is_correct: true

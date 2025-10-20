@@ -107,6 +107,86 @@ class GenerationLayer:
             )
             raise
 
+    async def generate_questions_with_conversation(
+        self, request: GenerationRequest, conversation_history: list
+    ) -> tuple[QuestionBatch, list]:
+        """Generate questions continuing an existing conversation
+        
+        Args:
+            request: Generation request with parameters
+            conversation_history: List of message dicts from previous interactions
+                                 [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}, 
+                                  {"role": "assistant", "content": "..."}, ...]
+        
+        Returns:
+            Tuple of (QuestionBatch, updated_conversation_history)
+        """
+        start_time = time.time()
+        logger.info(
+            f"Continuing conversation for {request.count} {request.question_type.value} questions, "
+            f"Settings - Difficulty: {request.difficulty_level}, Conversation length: {len(conversation_history)} messages"
+        )
+
+        # Get appropriate prompts
+        system_prompt, generation_prompt = self.prompt_service.get_prompts(
+            question_type=request.question_type,
+            count=request.count,
+            difficulty=request.difficulty_level.value,
+            topic=request.topic,
+        )
+
+        # Add custom instructions if provided
+        if request.custom_instructions:
+            generation_prompt = self.prompt_service.add_custom_instructions(
+                generation_prompt, request.custom_instructions
+            )
+
+        # Build conversation messages
+        # If conversation is empty, add system prompt
+        if not conversation_history:
+            conversation_history = [{"role": "system", "content": system_prompt}]
+        
+        # Add the new user request
+        conversation_history.append({"role": "user", "content": generation_prompt})
+
+        # Generate questions using LLM with conversation history
+        try:
+            llm_start = time.time()
+            logger.info(
+                f"Calling LLM API with conversation history ({len(conversation_history)} messages)"
+            )
+
+            response = await self.llm_service.generate_with_history(conversation_history)
+
+            llm_time = time.time() - llm_start
+            logger.info(
+                f"LLM API call completed in {llm_time:.2f}s. Response Metadata - "
+                f"Tokens: {response.tokens_used}, Cost: ${response.cost_estimate:.4f}"
+            )
+
+            # Add assistant response to conversation
+            conversation_history.append({"role": "assistant", "content": response.content})
+
+            # Parse and process response
+            questions = self._parse_and_create_questions(response.content, request)
+
+            # Create batch
+            batch = self._create_batch(questions, request, response, start_time)
+
+            total_time = time.time() - start_time
+            logger.info(f"Question generation with conversation completed in {total_time:.2f}s")
+            logger.info(
+                f"Generated batch '{batch.batch_id}' with {len(questions)} questions, "
+                f"Conversation now has {len(conversation_history)} messages"
+            )
+
+            return batch, conversation_history
+
+        except Exception as e:
+            elapsed_time = time.time() - start_time
+            logger.error(f"Conversation-based generation failed after {elapsed_time:.2f}s: {e}")
+            raise
+
     def _parse_and_create_questions(self, content: str, request: GenerationRequest) -> list:
         """Parse LLM response and create question objects
 

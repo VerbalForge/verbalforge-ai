@@ -1,17 +1,26 @@
 """
 Reading Comprehension Question Generation Task
 
-Generates RC passages with associated questions.
+Generates RC passages with associated questions using real articles from various sources.
+Supports multiple article sources through the modular article_sources package.
 """
 
 import asyncio
 import logging
+import sys
+from pathlib import Path
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from core.models.enums import PromptQuestionType
 from ..config import QUESTION_CONFIG
 from ..services import GeneratorService, MongoDBService
+
+try:
+    from ..article_sources import ArticleSourceFactory
+    ARTICLE_FETCHER_AVAILABLE = True
+except ImportError:
+    ARTICLE_FETCHER_AVAILABLE = False
 
 
 async def generate_reading_comprehension(
@@ -34,6 +43,17 @@ async def generate_reading_comprehension(
     questions_per_passage = config["questions_per_passage"]
     total_passages = config["easy"] + config["medium"] + config["hard"]
     total_questions = total_passages * questions_per_passage
+
+    # Get list of available article sources
+    available_sources = []
+    if ARTICLE_FETCHER_AVAILABLE:
+        try:
+            available_sources = ArticleSourceFactory.get_available_sources()
+            logger.info(f"Article sources available: {', '.join(available_sources)}")
+        except Exception as e:
+            logger.warning(f"Failed to get available sources: {e}. Using generic passages.")
+    else:
+        logger.warning("Article fetcher not available. Using generic passages.")
 
     logger.info(
         f"Starting RC generation: {total_passages} passages " f"({total_questions} questions total)"
@@ -63,6 +83,33 @@ async def generate_reading_comprehension(
                 f"({difficulty}) with {questions_per_passage} questions..."
             )
 
+            # Fetch article for this passage (weighted random selection favoring scientific sources)
+            topic_instruction = None
+            article_metadata = {}
+            
+            if available_sources:
+                try:
+                    # Use weighted random selection (scientific sources get higher weight)
+                    source_name = ArticleSourceFactory.get_random_source()
+                    article_source = ArticleSourceFactory.get_source(source_name) if source_name else None
+                    
+                    if article_source:
+                        articles = article_source.fetch_articles(count=1)
+                        if articles:
+                            article = articles[0]
+                            topic_instruction = article_source.format_for_rc_generation(article)
+                            article_metadata = {
+                                'source_url': article['url'],
+                                'source_title': article['title'],
+                                'source_section': article['section'],
+                                'source_attribution': article['source']
+                            }
+                            logger.info(f"Using article: '{article['title']}' from {article['source']} ({article['section']})")
+                        else:
+                            logger.warning(f"No article available, using generic passage")
+                except Exception as e:
+                    logger.warning(f"Error fetching article: {e}. Using generic passage.")
+
             max_retries = 2
             for attempt in range(max_retries):
                 try:
@@ -75,6 +122,7 @@ async def generate_reading_comprehension(
                             count=questions_per_passage,
                             question_type=PromptQuestionType.READING_COMPREHENSION,
                             difficulty=difficulty,
+                            topic=topic_instruction  # Pass Atlantic article context
                         ),
                         timeout=300.0,  # 5 minutes for passages
                     )
@@ -120,7 +168,21 @@ async def generate_reading_comprehension(
                                         "difficulty_level": difficulty,
                                         "type": "reading_comprehension_passage",
                                         "question_ids": stored_question_ids,
+                                        "metadata": {
+                                            "created_at": datetime.now().isoformat(),
+                                            "batch_id": batch_id,
+                                        }
                                     }
+                                    
+                                    # Add Atlantic article metadata if available
+                                    if article_metadata:
+                                        passage_data["metadata"].update({
+                                            "source_url": article_metadata.get('source_url'),
+                                            "source_title": article_metadata.get('source_title'),
+                                            "source_section": article_metadata.get('source_section'),
+                                            "source_attribution": "The Atlantic"
+                                        })
+                                        logger.info(f"Stored passage with Atlantic source: {article_metadata.get('source_url')}")
 
                                     passage_id = db.store_single_passage(passage_data, batch_id)
 

@@ -1,14 +1,14 @@
 GENERATION_INTERVAL_HOURS = 2
 QUESTION_CONFIG = {
     "text_completion": {
-        "easy": 5,
-        "medium": 5,
-        "hard": 5,
+        "easy": 3,
+        "medium": 6,
+        "hard": 6,
     },
     "sentence_equivalence": {
-        "easy": 5,
-        "medium": 5,
-        "hard": 5,
+        "easy": 3,
+        "medium": 6,
+        "hard": 6,
     },
     "reading_comprehension": {
         "easy": 2,

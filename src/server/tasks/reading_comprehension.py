@@ -9,7 +9,7 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from core.models.enums import PromptQuestionType
@@ -159,6 +159,8 @@ async def generate_reading_comprehension(
                                             stored_question_ids.append(str(question["_id"]))
 
                                     # Store passage with only successfully stored question IDs
+                                    timestamp = datetime.now(timezone.utc)
+                                    
                                     passage_data = {
                                         "passage": rc_item["passage"]["text"],
                                         "source": rc_item["passage"].get("source", "Unknown"),
@@ -169,7 +171,7 @@ async def generate_reading_comprehension(
                                         "type": "reading_comprehension_passage",
                                         "question_ids": stored_question_ids,
                                         "metadata": {
-                                            "created_at": datetime.now().isoformat(),
+                                            "created_at": timestamp.isoformat(),
                                             "batch_id": batch_id,
                                         }
                                     }

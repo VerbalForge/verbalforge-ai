@@ -71,7 +71,9 @@ class ArticleSource(ABC):
             - Ensure the passage is self-contained and comprehensive
             - In the JSON response:
             * Set "source": "{self.source_name}"
-            * Set "title": "{article['title']}" 
+            * Generate a creative, engaging "title" that captures the passage's main theme
+            * Do NOT use the original article title - create a new, GRE-appropriate title
+            * The title should be academic yet intriguing (e.g., "The Evolution of Quantum Networks" instead of "Scientists just took a big step toward the quantum internet")
   """
 
         return topic_instruction

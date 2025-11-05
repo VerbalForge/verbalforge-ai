@@ -1,80 +1,48 @@
 #!/bin/bash
-#
-# VerbalForge Server Production Startup Script
-#
-# This script starts the VerbalForge question generation server in production mode.
-#
 
-set -e  # Exit on any error
+# VerbalForge Server Startup Script
+# Starts the question generation runners
 
-# Get the script directory (project root)
+set -e
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+echo "=================================================="
+echo "VerbalForge Question Generation Server"
+echo "=================================================="
+echo ""
 
 # Change to project root
 cd "$PROJECT_ROOT"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-# Logging function
-log() {
-    echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1"
-}
-
-warn() {
-    echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] WARNING:${NC} $1"
-}
-
-error() {
-    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERROR:${NC} $1"
-    exit 1
-}
-
 # Check if virtual environment exists
-if [ ! -d ".venv" ]; then
-    error "Virtual environment not found. Please run 'make install' first."
+if [ ! -d "venv" ]; then
+    echo "⚠️  Virtual environment not found. Creating..."
+    python3 -m venv venv
 fi
 
-# Check if .env file exists
-if [ ! -f ".env" ]; then
-    warn ".env file not found. Make sure to configure environment variables."
+# Activate virtual environment
+echo "📦 Activating virtual environment..."
+source venv/bin/activate
+
+# Install/update dependencies
+echo "📥 Installing dependencies..."
+pip install -q --upgrade pip
+pip install -q -r requirements.txt
+
+# Check if config file exists
+if [ ! -f "runner_config.yaml" ]; then
+    echo "⚠️  runner_config.yaml not found. Using default configuration."
+    echo "💡 Create runner_config.yaml to customize runner behavior."
 fi
-
-# Verify Python executable
-PYTHON_EXEC=".venv/bin/python"
-if [ ! -x "$PYTHON_EXEC" ]; then
-    error "Python executable not found at $PYTHON_EXEC"
-fi
-
-# Check Python version
-PYTHON_VERSION=$($PYTHON_EXEC --version 2>&1)
-log "Using $PYTHON_VERSION"
-
-# Set environment variables
-export ENVIRONMENT=production
-export LOG_LEVEL=${LOG_LEVEL:-INFO}
-export PYTHONPATH=src
-
-# Verify server module can be imported
-log "Validating server module..."
-if ! $PYTHON_EXEC -c "import server.main" 2>/dev/null; then
-    error "Failed to import server module. Please check dependencies."
-fi
-
-log "Starting VerbalForge Server (Production Mode)..."
-log "Press Ctrl+C to stop the server"
-log "Logs will be written to logs/verbalforge.log"
 
 # Create logs directory if it doesn't exist
 mkdir -p logs
 
-# Get absolute path to Python executable
-PYTHON_EXEC_ABS="$PROJECT_ROOT/$PYTHON_EXEC"
+echo ""
+echo "🚀 Starting Server..."
+echo ""
 
-# Start the server with proper error handling
-cd src
-exec "$PYTHON_EXEC_ABS" -m server.main
+# Run the server
+python -m src.server.main "$@"

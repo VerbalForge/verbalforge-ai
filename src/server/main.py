@@ -5,11 +5,12 @@ Main entry point for the continuous question generation service.
 Orchestrates the generation of GRE questions and stores them in MongoDB.
 """
 
+import argparse
 import asyncio
 import signal
 import sys
 
-from .config import LOG_LEVEL, LOG_FILE, QUESTION_CONFIG, GENERATION_INTERVAL_HOURS
+from .config import LOG_LEVEL, LOG_FILE, QUESTION_CONFIG
 from .config.settings import settings
 from .utils import setup_logging
 from .services import GeneratorService, MongoDBService
@@ -58,17 +59,21 @@ class VerbalForgeServer:
         rc_passages = rc_cfg["easy"] + rc_cfg["medium"] + rc_cfg["hard"]
         rc_total = rc_passages * rc_cfg["questions_per_passage"]
 
-        self.logger.info("GENERATION CONFIGURATION:")
+        self.logger.info("INDEPENDENT WORKER CONFIGURATION:")
         self.logger.info(
-            f"  Text Completion: {tc_total} questions "
-            f"({tc_cfg['easy']} easy, {tc_cfg['medium']} medium, {tc_cfg['hard']} hard)"
+            f"  TC Runner: {tc_total} questions per cycle "
+            f"({tc_cfg['easy']} easy, {tc_cfg['medium']} medium, {tc_cfg['hard']} hard) "
+            f"- Every {self.scheduler.tc_runner.interval_hours}h"
         )
         self.logger.info(
-            f"  Sentence Equivalence: {se_total} questions "
-            f"({se_cfg['easy']} easy, {se_cfg['medium']} medium, {se_cfg['hard']} hard)"
+            f"  SE Runner: {se_total} questions per cycle "
+            f"({se_cfg['easy']} easy, {se_cfg['medium']} medium, {se_cfg['hard']} hard) "
+            f"- Every {self.scheduler.se_runner.interval_hours}h"
         )
-        self.logger.info(f"  Reading Comprehension: {rc_total} questions ({rc_passages} passages)")
-        self.logger.info(f"  Interval: {GENERATION_INTERVAL_HOURS} hours")
+        self.logger.info(
+            f"  RC Runner: {rc_total} questions per cycle ({rc_passages} passages) "
+            f"- Every {self.scheduler.rc_runner.interval_hours}h"
+        )
         self.logger.info("")
 
     async def run(self) -> None:
@@ -101,6 +106,42 @@ class VerbalForgeServer:
 
 async def main():
     """Main entry point"""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='VerbalForge Question Generation Server')
+    parser.add_argument(
+        '--reset-state',
+        action='store_true',
+        help='Reset all runner states before starting (clears last run times and schedules)'
+    )
+    parser.add_argument(
+        '--reset-articles',
+        action='store_true',
+        help='Reset used articles tracking (allows reusing articles)'
+    )
+    args = parser.parse_args()
+    
+    # If resetting, do it before initializing server
+    if args.reset_state or args.reset_articles:
+        # Create temporary DB connection for reset operations
+        from .services import MongoDBService
+        from .config.settings import settings
+        
+        temp_db = MongoDBService(settings.mongodb_uri, settings.mongodb_database)
+        temp_db.connect()
+        
+        if args.reset_state:
+            print("\n🔄 Resetting runner states...")
+            temp_db.reset_runner_states()
+            print("✅ Runner states reset successfully\n")
+        
+        if args.reset_articles:
+            print("\n🔄 Resetting used articles tracking...")
+            temp_db.reset_used_articles()
+            print("✅ Used articles reset successfully\n")
+        
+        temp_db.disconnect()
+    
+    # Now initialize and start server
     server = VerbalForgeServer()
     server.setup()
 

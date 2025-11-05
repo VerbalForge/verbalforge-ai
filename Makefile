@@ -1,6 +1,6 @@
 # Makefile for VerbalForge Server
 SHELL := /bin/bash
-.PHONY: help install clean clean-db test lint format run dev
+.PHONY: help install clean clean-db test lint format run dev reset-state reset-articles
 
 # Default target
 help:
@@ -8,14 +8,16 @@ help:
 	@echo "======================================"
 	@echo ""
 	@echo "Available commands:"
-	@echo "  install    Install package and dependencies"
-	@echo "  run        Run server (production mode)"
-	@echo "  dev        Run server (development mode)"
-	@echo "  clean      Clean build artifacts and cache"
-	@echo "  clean-db   Wipe MongoDB database (WARNING: deletes all data!)"
-	@echo "  test       Run all tests"
-	@echo "  lint       Run code linting"
-	@echo "  format     Format code with black"
+	@echo "  install         Install package and dependencies"
+	@echo "  run             Run server (production mode)"
+	@echo "  dev             Run server (development mode)"
+	@echo "  reset-state     Reset runner states and start fresh"
+	@echo "  reset-articles  Reset used articles tracking"
+	@echo "  clean           Clean build artifacts and cache"
+	@echo "  clean-db        Wipe MongoDB database (WARNING: deletes all data!)"
+	@echo "  test            Run all tests"
+	@echo "  lint            Run code linting"
+	@echo "  format          Format code with black"
 
 # Installation
 install:
@@ -36,6 +38,18 @@ run:
 dev:
 	@echo "Starting VerbalForge Server (development mode)..."
 	@cd src && PYTHONPATH=. ../.venv/bin/python -m server.main
+
+# Reset runner states
+reset-state:
+	@echo "Resetting runner states..."
+	@cd src && PYTHONPATH=. ../.venv/bin/python -m server.main --reset-state
+	@echo "Runner states reset complete!"
+
+# Reset used articles
+reset-articles:
+	@echo "Resetting used articles tracking..."
+	@cd src && PYTHONPATH=. ../.venv/bin/python -m server.main --reset-articles
+	@echo "Used articles reset complete!"
 
 # Clean up
 clean:

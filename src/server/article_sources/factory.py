@@ -13,6 +13,8 @@ from .atlantic import AtlanticArticleSource
 from .sciencedaily import ScienceDailyArticleSource
 from .nationalgeographic import NationalGeographicArticleSource
 from .popularscience import PopularScienceArticleSource
+from .ancientorigins import AncientOriginsArticleSource
+from .psychologytoday import PsychologyTodayArticleSource
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +27,10 @@ class ArticleSourceFactory:
         'atlantic': AtlanticArticleSource,
         'sciencedaily': ScienceDailyArticleSource,
         'popularscience': PopularScienceArticleSource,
+        'ancientorigins': AncientOriginsArticleSource,
+        'psychologytoday': PsychologyTodayArticleSource,
         # 'discover': DiscoverMagazineArticleSource,  # Temporarily disabled - performance issues
         # 'nationalgeographic': NationalGeographicArticleSource,  # Temporarily disabled - needs optimization
-        # 'psychologytoday': PsychologyTodayArticleSource,  # Temporarily disabled - scraping issues
     }
     
     # Weights for random selection (higher = more likely)
@@ -35,6 +38,8 @@ class ArticleSourceFactory:
     _weights = {
         'sciencedaily': 4,      # Highest weight - pure science
         'popularscience': 3,    # High weight - science/tech magazine
+        'psychologytoday': 2,   # Medium weight - psychology/behavioral science
+        'ancientorigins': 3,    # High weight - archaeology/history
         'atlantic': 1,          # Lower weight - general journalism (but filtered)
     }
 

@@ -2,24 +2,21 @@
 Task Scheduler
 
 Orchestrates generation cycles and manages the execution loop.
+Runs TC, SE, and RC runners as independent workers with persistent state.
 """
 
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import List
 
-from .config import GENERATION_INTERVAL_HOURS
 from .services import GeneratorService, MongoDBService
 from .models import ServerStats
-from .tasks import (
-    generate_text_completion,
-    generate_sentence_equivalence,
-    generate_reading_comprehension,
-)
+from .runners import TCRunner, SERunner, RCRunner
 
 
 class TaskScheduler:
-    """Manages scheduled question generation cycles"""
+    """Manages independent runner workers"""
 
     def __init__(self, generator: GeneratorService, db: MongoDBService, stats: ServerStats):
         self.generator = generator
@@ -27,111 +24,116 @@ class TaskScheduler:
         self.stats = stats
         self.running = False
         self.logger = logging.getLogger("VerbalForgeServer.Scheduler")
+        
+        # Initialize runners as independent workers
+        self.tc_runner = TCRunner(generator, db)
+        self.se_runner = SERunner(generator, db)
+        self.rc_runner = RCRunner(generator, db)
+        
+        # Track worker tasks
+        self.worker_tasks: List[asyncio.Task] = []
 
     def is_running(self) -> bool:
         """Check if scheduler is still running"""
         return self.running
 
-    async def run_generation_cycle(self) -> bool:
-        """
-        Execute one complete generation cycle
-
-        Returns:
-            True if successful, False otherwise
-        """
-        self.logger.info("Starting generation cycle")
-        start_time = datetime.now(timezone.utc)
-
-        try:
-            all_questions = []
-
-            # Run each generation task
-            if self.running:
-                tc_questions = await generate_text_completion(
-                    self.generator, self.db, self.is_running
-                )
-                all_questions.extend(tc_questions)
-
-            if self.running:
-                se_questions = await generate_sentence_equivalence(
-                    self.generator, self.db, self.is_running
-                )
-                all_questions.extend(se_questions)
-
-            if self.running:
-                rc_questions = await generate_reading_comprehension(
-                    self.generator, self.db, self.is_running
-                )
-                all_questions.extend(rc_questions)
-
-            if not self.running:
-                self.logger.info("Cycle interrupted by shutdown")
-                return False
-
-            # Update stats
-            end_time = datetime.now(timezone.utc)
-            duration = (end_time - start_time).total_seconds()
-
-            self.stats.total_runs += 1
-            self.stats.last_run_time = end_time
-
-            if all_questions:
-                self.stats.successful_runs += 1
-                self.stats.last_success_time = end_time
-                self.stats.total_questions_generated += len(all_questions)
-
-                self.logger.info(
-                    f"Cycle completed in {duration:.1f}s - "
-                    f"{len(all_questions)} questions generated"
-                )
-                return True
-            else:
-                self.stats.failed_runs += 1
-                self.logger.error("No questions generated")
-                return False
-
-        except Exception as e:
-            self.stats.failed_runs += 1
-            self.logger.error(f"Cycle failed: {e}")
-            return False
-
     async def run(self) -> None:
-        """Main scheduler loop"""
+        """Launch all runners as independent workers"""
         self.running = True
-
+        
         try:
-            # Run initial cycle
-            self.logger.info("Running initial generation cycle")
-            await self.run_generation_cycle()
-            self.stats.log_summary(self.logger)
-
-            # Main loop
-            while self.running:
-                next_run = datetime.now(timezone.utc) + timedelta(hours=GENERATION_INTERVAL_HOURS)
-                self.logger.info(f"Next cycle scheduled for: {next_run}")
-
-                # Sleep with periodic shutdown checks
-                sleep_total = GENERATION_INTERVAL_HOURS * 3600
-                check_interval = 5  # Check every 5 seconds
-
-                for _ in range(int(sleep_total // check_interval)):
-                    if not self.running:
-                        break
-                    await asyncio.sleep(check_interval)
-
-                # Sleep remaining time
-                if self.running:
-                    remaining = sleep_total % check_interval
-                    await asyncio.sleep(remaining)
-
-                # Run next cycle
-                if self.running:
-                    await self.run_generation_cycle()
-                    self.stats.log_summary(self.logger)
-
+            self.logger.info("Starting VerbalForge Scheduler with independent workers")
+            self.logger.info(f"TC Runner: every {self.tc_runner.interval_hours}h")
+            self.logger.info(f"SE Runner: every {self.se_runner.interval_hours}h")
+            self.logger.info(f"RC Runner: every {self.rc_runner.interval_hours}h")
+            
+            # Launch all runners as independent workers
+            self.worker_tasks = [
+                asyncio.create_task(self.tc_runner.run_as_worker(), name="TC_Worker"),
+                asyncio.create_task(self.se_runner.run_as_worker(), name="SE_Worker"),
+                asyncio.create_task(self.rc_runner.run_as_worker(), name="RC_Worker"),
+            ]
+            
+            self.logger.info("All workers launched")
+            
+            # Wait for all workers to complete (or be cancelled)
+            await asyncio.gather(*self.worker_tasks, return_exceptions=True)
+            
         except asyncio.CancelledError:
             self.logger.info("Scheduler cancelled")
             raise
+        except Exception as e:
+            self.logger.error(f"Scheduler error: {e}")
+        finally:
+            await self.shutdown()
+
+    async def shutdown(self) -> None:
+        """Clean shutdown of all workers"""
+        self.logger.info("Shutting down scheduler and all workers")
+        self.running = False
+        
+        # Stop all runners
+        self.tc_runner.stop()
+        self.se_runner.stop()
+        self.rc_runner.stop()
+        
+        # Cancel all worker tasks
+        for task in self.worker_tasks:
+            if not task.done():
+                task.cancel()
+        
+        # Wait for tasks to finish cancelling
+        if self.worker_tasks:
+            await asyncio.gather(*self.worker_tasks, return_exceptions=True)
+        
+        self.logger.info("All workers stopped")
+        
+        # Aggregate stats from all runners
+        if self.stats:
+            self._aggregate_runner_stats()
+            self.stats.log_summary(self.logger)
+    
+    def _aggregate_runner_stats(self) -> None:
+        """Aggregate statistics from all runners into server stats"""
+        # Collect stats from all runners
+        runners = [self.tc_runner, self.se_runner, self.rc_runner]
+        
+        total_runs = 0
+        successful_runs = 0
+        failed_runs = 0
+        total_questions = 0
+        
+        for runner in runners:
+            if runner.state:
+                total_runs += runner.state.total_runs
+                successful_runs += runner.state.successful_runs
+                failed_runs += runner.state.failed_runs
+                total_questions += runner.state.total_questions_generated
+        
+        # Update server stats
+        self.stats.total_runs = total_runs
+        self.stats.successful_runs = successful_runs
+        self.stats.failed_runs = failed_runs
+        self.stats.total_questions_generated = total_questions
+        
+        # Log individual runner stats
+        self.logger.info("")
+        self.logger.info("=" * 60)
+        self.logger.info("RUNNER STATISTICS")
+        self.logger.info("=" * 60)
+        
+        for runner in runners:
+            if runner.state:
+                runner_name = runner.runner_id.upper().replace('_', ' ')
+                self.logger.info(f"{runner_name}:")
+                self.logger.info(f"  Total Runs: {runner.state.total_runs}")
+                self.logger.info(f"  Successful: {runner.state.successful_runs}")
+                self.logger.info(f"  Failed: {runner.state.failed_runs}")
+                self.logger.info(f"  Questions Generated: {runner.state.total_questions_generated}")
+                self.logger.info(f"  Next Run: {runner.state.next_run_time}")
+                self.logger.info("")
+        
+        self.logger.info("=" * 60)
 
     def stop(self) -> None:
         """Stop the scheduler"""

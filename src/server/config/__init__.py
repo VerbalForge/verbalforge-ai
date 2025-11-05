@@ -1,7 +1,7 @@
 """Configuration module for VerbalForge Server"""
 
 from .constants import (
-    GENERATION_INTERVAL_HOURS,
+    RUNNER_INTERVALS,
     QUESTION_CONFIG,
     LOG_LEVEL,
     LOG_FILE,
@@ -9,7 +9,7 @@ from .constants import (
 from .settings import get_settings
 
 __all__ = [
-    "GENERATION_INTERVAL_HOURS",
+    "RUNNER_INTERVALS",
     "QUESTION_CONFIG",
     "LOG_LEVEL",
     "LOG_FILE",
